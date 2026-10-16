@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cobalt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>disk-guard — Scheduled Temp &amp; Clone Cleaner for macOS and Windows</title>
+  <meta name="description" content="Zero-dependency scheduled disk cleaner for macOS (LaunchAgent) and Windows (Scheduled Task). Reclaims leaked Chromium code_sign_clone, scoped_dir, pytest, XcodeDistPipeline, and coding-agent caches.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5 */
+    /* Hallmark · genre: modern-minimal · macrostructure: Narrative Workflow · theme: Cobalt · enrichment: none · nav: N5 · footer: Ft2 · audience: anyone running Chromium/dev/AI tools · use: star on GitHub & copy 1-line install · tone: technical professional · H2 Split Diptych knobs: ratio=7/5, right=proof-column, divider=hairline · F4 Step sequence knobs: numbering=1.0/2.0/3.0, layout=vertical-stack, connector=line · F3 Tabular spec sheet knobs: columns=4, rules=every-row, numbers=tabular · N5 knobs: width=max-720px, backdrop=blur+saturate, anchor=top-centred · Ft2 knobs: order=wordmark/links/credit, separator=middot, density=spaced · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
+
+    :root,
+    [data-theme="cobalt"] {
+      --color-paper:      oklch(98.5% 0.004 250);
+      --color-paper-2:    oklch(96.5% 0.005 252);
+      --color-paper-3:    oklch(94%   0.006 254);
+      --color-rule:       oklch(90%   0.008 255);
+      --color-rule-2:     oklch(78%   0.012 255);
+      --color-muted:      oklch(48%   0.015 255);
+      --color-neutral:    oklch(40%   0.016 255);
+      --color-ink-2:      oklch(32%   0.018 257);
+      --color-ink:        oklch(20%   0.020 258);
+      --color-accent:     oklch(52%   0.20  256);
+      --color-accent-ink: oklch(99%   0.004 256);
+      --color-focus:      oklch(52%   0.20  256);
+      --color-graphite:   oklch(20%   0.018 260);
+      --color-graphite-2: oklch(26%   0.020 260);
+      --color-graphite-rule: oklch(34% 0.020 260);
+      --color-graphite-ink: oklch(95% 0.006 250);
+      --color-graphite-muted: oklch(72% 0.012 250);
+      --color-nav-bg:     oklch(98.5% 0.004 250 / 0.86);
+      --color-shadow:     oklch(20%   0.020 258 / 0.08);
+      --color-transparent: oklch(0% 0 0 / 0);
+
+      --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+      --font-body:    "Inter", ui-sans-serif, system-ui, sans-serif;
+      --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+      --text-xs:   0.75rem;
+      --text-sm:   0.875rem;
+      --text-base: 1rem;
+      --text-md:   1.125rem;
+      --text-lg:   1.375rem;
+      --text-xl:   1.75rem;
+      --text-2xl:  2.25rem;
+      --text-display:   clamp(2.25rem, 4.2vw + 0.5rem, 4.0rem);
+      --text-display-s: clamp(1.65rem, 2.8vw + 0.5rem, 2.5rem);
+
+      --lh-tight:   1.06;
+      --lh-snug:    1.2;
+      --lh-normal:  1.5;
+      --lh-relaxed: 1.65;
+
+      --tracking-display: -0.03em;
+      --tracking-tight:   -0.015em;
+      --tracking-normal:  0;
+      --tracking-label:   0.06em;
+
+      --space-3xs: 0.125rem;
+      --space-2xs: 0.25rem;
+      --space-xs:  0.5rem;
+      --space-sm:  0.75rem;
+      --space-md:  1rem;
+      --space-lg:  1.5rem;
+      --space-xl:  2.5rem;
+      --space-2xl: 4rem;
+      --space-3xl: 6rem;
+      --space-4xl: 8.5rem;
+
+      --page-max:      74rem;
+      --page-gutter:   clamp(1rem, 4vw, 3rem);
+      --measure:       62ch;
+      --rule-hair:     1px;
+      --rule-heavy:    2px;
+
+      --radius-card:   8px;
+      --radius-pill:   999px;
+      --radius-btn:    6px;
+
+      --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-micro:  120ms;
+      --dur-short:  200ms;
+
+      --z-base:       1;
+      --z-raised:     10;
+      --z-sticky-nav: 300;
+      --banner-height: 64px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      overflow-x: clip;
+      background-color: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--lh-normal);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--page-max);
+      margin-inline: auto;
+      padding-inline: var(--page-gutter);
+    }
+
+    /* N5 · Floating pill navigation */
+    .nav-wrap {
+      position: sticky;
+      top: var(--space-md);
+      z-index: var(--z-sticky-nav);
+      display: flex;
+      justify-content: center;
+      padding-inline: var(--page-gutter);
+      margin-top: var(--space-md);
+      pointer-events: none;
+    }
+
+    .nav-pill {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      width: 100%;
+      max-width: 44rem;
+      padding: var(--space-xs) var(--space-md);
+      background-color: var(--color-nav-bg);
+      backdrop-filter: blur(14px) saturate(120%);
+      -webkit-backdrop-filter: blur(14px) saturate(120%);
+      border: var(--rule-hair) solid var(--color-rule-2);
+      border-radius: var(--radius-pill);
+      box-shadow: 0 8px 24px -12px var(--color-shadow);
+    }
+
+    .wordmark {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      text-decoration: none;
+      letter-spacing: var(--tracking-tight);
+      white-space: nowrap;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .wordmark__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background-color: var(--color-accent);
+      display: inline-block;
+    }
+
+    .nav-pill__links {
+      display: none;
+      list-style: none;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    @media (min-width: 42rem) {
+      .nav-pill__links {
+        display: inline-flex;
+      }
+    }
+
+    .nav__link {
+      font-size: var(--text-sm);
+      color: var(--color-ink-2);
+      text-decoration: none;
+      white-space: nowrap;
+      line-height: 1;
+      padding: var(--space-xs) var(--space-2xs);
+      border-radius: var(--radius-btn);
+      outline: 2px solid var(--color-transparent);
+      outline-offset: 2px;
+      transition: color var(--dur-micro) var(--ease-out);
+    }
+
+    .nav__link:hover {
+      color: var(--color-ink);
+    }
+
+    .nav__link:focus-visible {
+      outline-color: var(--color-focus);
+    }
+
+    .nav__link:active {
+      color: var(--color-accent);
+    }
+
+    /* Buttons & Interactive states */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      line-height: 1;
+      white-space: nowrap;
+      text-decoration: none;
+      min-height: 44px;
+      padding: var(--space-xs) var(--space-md);
+      border-radius: var(--radius-btn);
+      border: var(--rule-hair) solid var(--color-ink);
+      background-color: var(--color-ink);
+      color: var(--color-paper);
+      cursor: pointer;
+      outline: 2px solid var(--color-transparent);
+      outline-offset: 2px;
+      transition: background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
+    }
+
+    .btn--nav {
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-pill);
+    }
+
+    @media (pointer: coarse) {
+      .btn--nav {
+        min-height: 44px;
+      }
+    }
+
+    .btn:hover {
+      background-color: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-accent-ink);
+    }
+
+    .btn:focus-visible {
+      outline-color: var(--color-focus);
+    }
+
+    .btn:active {
+      background-color: var(--color-ink-2);
+      border-color: var(--color-ink-2);
+    }
+
+    .btn:disabled,
+    .btn[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn--outline {
+      background-color: var(--color-paper);
+      color: var(--color-ink);
+      border-color: var(--color-rule-2);
+    }
+
+    .btn--outline:hover {
+      background-color: var(--color-paper-2);
+      border-color: var(--color-ink);
+      color: var(--color-ink);
+    }
+
+    .btn--outline:active {
+      background-color: var(--color-paper-3);
+    }
+
+    .icon-svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* H2 · Split Diptych Hero (fits 1280x800 fold, padding-block-end >= 1.3x start) */
+    .hero {
+      padding-block-start: var(--space-xl);
+      padding-block-end: var(--space-3xl);
+      border-bottom: var(--rule-hair) solid var(--color-rule);
+    }
+
+    .hero__grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-xl);
+      align-items: start;
+    }
+
+    @media (min-width: 60rem) {
+      .hero__grid {
+        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+        gap: var(--space-2xl);
+        align-items: center;
+      }
+    }
+
+    .hero__tag {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-accent);
+      letter-spacing: var(--tracking-label);
+      text-transform: uppercase;
+      margin-bottom: var(--space-sm);
+    }
+
+    .hero__title {
+      font-family: var(--font-display);
+      font-size: var(--text-display);
+      font-weight: 600;
+      font-style: normal;
+      line-height: var(--lh-tight);
+      letter-spacing: var(--tracking-display);
+      color: var(--color-ink);
+      overflow-wrap: anywhere;
+      min-width: 0;
+      margin-bottom: var(--space-md);
+    }
+
+    .hero__lede {
+      font-size: var(--text-md);
+      color: var(--color-ink-2);
+      max-width: 56ch;
+      line-height: var(--lh-normal);
+      margin-bottom: var(--space-lg);
+    }
+
+    .hero__actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    /* Right column: typographic command switcher (no fake window chrome, gate 47) */
+    .cmd-panel {
+      background-color: var(--color-graphite);
+      color: var(--color-graphite-ink);
+      border: var(--rule-hair) solid var(--color-graphite-rule);
+      border-radius: var(--radius-card);
+      padding: var(--space-lg);
+    }
+
+    .cmd-panel__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      padding-bottom: var(--space-sm);
+      margin-bottom: var(--space-md);
+      border-bottom: var(--rule-hair) solid var(--color-graphite-rule);
+    }
+
+    .os-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      background-color: var(--color-graphite-2);
+      padding: var(--space-3xs);
+      border-radius: var(--radius-btn);
+    }
+
+    .os-tab {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      line-height: 1;
+      white-space: nowrap;
+      color: var(--color-graphite-muted);
+      background-color: var(--color-transparent);
+      border: var(--rule-hair) solid var(--color-transparent);
+      border-radius: var(--radius-btn);
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      cursor: pointer;
+      outline: 2px solid var(--color-transparent);
+      outline-offset: 1px;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    @media (pointer: coarse) {
+      .os-tab {
+        min-height: 44px;
+      }
+    }
+
+    .os-tab[aria-selected="true"] {
+      background-color: var(--color-accent);
+      color: var(--color-accent-ink);
+    }
+
+    .os-tab:hover:not([aria-selected="true"]) {
+      color: var(--color-graphite-ink);
+    }
+
+    .os-tab:focus-visible {
+      outline-color: var(--color-focus);
+    }
+
+    .os-tab:active {
+      background-color: var(--color-ink);
+    }
+
+    .os-tab:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1;
+      white-space: nowrap;
+      color: var(--color-graphite-ink);
+      background-color: var(--color-graphite-2);
+      border: var(--rule-hair) solid var(--color-graphite-rule);
+      border-radius: var(--radius-btn);
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      cursor: pointer;
+      outline: 2px solid var(--color-transparent);
+      outline-offset: 1px;
+      transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+    }
+
+    @media (pointer: coarse) {
+      .copy-btn {
+        min-height: 44px;
+      }
+    }
+
+    .copy-btn:hover {
+      border-color: var(--color-accent);
+    }
+
+    .copy-btn:focus-visible {
+      outline-color: var(--color-focus);
+    }
+
+    .copy-btn:active {
+      background-color: var(--color-accent);
+      color: var(--color-accent-ink);
+    }
+
+    .copy-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .cmd-code {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: var(--lh-relaxed);
+      color: var(--color-graphite-ink);
+      overflow-x: auto;
+      white-space: pre;
+      padding-bottom: var(--space-sm);
+    }
+
+    .cmd-meta {
+      margin-top: var(--space-sm);
+      padding-top: var(--space-sm);
+      border-top: var(--rule-hair) solid var(--color-graphite-rule);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-xs);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-graphite-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* T4 · Numbered stat strip (real thresholds only, gate 46) */
+    .stat-strip {
+      background-color: var(--color-paper-2);
+      border-bottom: var(--rule-hair) solid var(--color-rule);
+      padding-block: var(--space-xl);
+    }
+
+    .stat-strip__grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-lg);
+    }
+
+    @media (min-width: 40rem) {
+      .stat-strip__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 60rem) {
+      .stat-strip__grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    .stat-item {
+      padding-left: var(--space-md);
+      border-left: var(--rule-heavy) solid var(--color-rule-2);
+    }
+
+    .stat-item__num {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      font-style: normal;
+      line-height: var(--lh-tight);
+      color: var(--color-ink);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: var(--space-2xs);
+    }
+
+    .stat-item__label {
+      font-size: var(--text-sm);
+      color: var(--color-muted);
+      max-width: 45ch;
+    }
+
+    /* Section typography — single column head (gate 52 & 54) */
+    .section {
+      padding-block: var(--space-3xl);
+      border-bottom: var(--rule-hair) solid var(--color-rule);
+    }
+
+    .section--alt {
+      background-color: var(--color-paper-2);
+      padding-block: var(--space-2xl);
+    }
+
+    .section__head {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-xl);
+      max-width: var(--measure);
+    }
+
+    .section__title {
+      font-family: var(--font-display);
+      font-size: var(--text-display-s);
+      font-weight: 600;
+      font-style: normal;
+      line-height: var(--lh-snug);
+      letter-spacing: var(--tracking-display);
+      color: var(--color-ink);
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .section__desc {
+      font-size: var(--text-base);
+      color: var(--color-ink-2);
+      max-width: var(--measure);
+    }
+
+    /* Macrostructure 14 · Narrative Workflow (F4 Step sequence) */
+    .workflow-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .workflow-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-md);
+      padding-block: var(--space-xl);
+      border-top: var(--rule-heavy) solid var(--color-ink);
+    }
+
+    @media (min-width: 60rem) {
+      .workflow-stage {
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+        gap: var(--space-2xl);
+        align-items: start;
+      }
+    }
+
+    .stage__header {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .stage__num {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--color-accent);
+      letter-spacing: var(--tracking-label);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stage__title {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      font-style: normal;
+      line-height: var(--lh-snug);
+      color: var(--color-ink);
+      overflow-wrap: anywhere;
+      min-width: 0;
+    }
+
+    .stage__body {
+      font-size: var(--text-base);
+      color: var(--color-ink-2);
+      max-width: var(--measure);
+      margin-bottom: var(--space-md);
+    }
+
+    .stage__proof {
+      background-color: var(--color-paper-3);
+      border: var(--rule-hair) solid var(--color-rule-2);
+      border-radius: var(--radius-card);
+      padding: var(--space-md);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: var(--lh-relaxed);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* F3 · Tabular spec sheet */
+    .spec-wrap {
+      width: 100%;
+    }
+
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+      text-align: left;
+    }
+
+    .spec-table th,
+    .spec-table td {
+      padding: var(--space-md) var(--space-sm);
+      border-bottom: var(--rule-hair) solid var(--color-rule-2);
+      vertical-align: top;
+    }
+
+    .spec-table th {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: var(--tracking-label);
+      color: var(--color-muted);
+      border-bottom: var(--rule-heavy) solid var(--color-ink);
+    }
+
+    .spec-table td {
+      font-size: var(--text-sm);
+      color: var(--color-ink-2);
+    }
+
+    .spec-table td:first-child {
+      font-weight: 500;
+      color: var(--color-ink);
+    }
+
+    .spec-code {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink);
+      background-color: var(--color-paper-3);
+      padding: var(--space-3xs) var(--space-xs);
+      border-radius: var(--radius-btn);
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 48rem) {
+      .spec-table thead {
+        display: none;
+      }
+      .spec-table,
+      .spec-table tbody,
+      .spec-table tr,
+      .spec-table td {
+        display: block;
+        width: 100%;
+      }
+      .spec-table tr {
+        padding-block: var(--space-md);
+        border-bottom: var(--rule-hair) solid var(--color-rule-2);
+      }
+      .spec-table td {
+        border-bottom: none;
+        padding: var(--space-2xs) 0;
+      }
+      .spec-table td::before {
+        content: attr(data-label);
+        display: block;
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--color-muted);
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-label);
+        margin-bottom: var(--space-3xs);
+      }
+    }
+
+    /* Closing Star CTA */
+    .cta-band {
+      padding-block: var(--space-3xl);
+      background-color: var(--color-paper);
+    }
+
+    .cta-band__box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-lg);
+      padding: var(--space-xl);
+      background-color: var(--color-paper-2);
+      border: var(--rule-hair) solid var(--color-rule-2);
+      border-radius: var(--radius-card);
+    }
+
+    @media (min-width: 52rem) {
+      .cta-band__box {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+
+    .cta-band__title {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      font-style: normal;
+      line-height: var(--lh-snug);
+      color: var(--color-ink);
+      overflow-wrap: anywhere;
+      min-width: 0;
+      margin-bottom: var(--space-xs);
+    }
+
+    .cta-band__sub {
+      font-size: var(--text-sm);
+      color: var(--color-ink-2);
+      max-width: 55ch;
+    }
+
+    /* Ft2 · Inline single line footer */
+    .foot-line {
+      border-top: var(--rule-hair) solid var(--color-rule-2);
+      padding-block: var(--space-xl);
+    }
+
+    .foot-line__inner {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      align-items: flex-start;
+      justify-content: space-between;
+      font-size: var(--text-sm);
+      color: var(--color-muted);
+    }
+
+    @media (min-width: 44rem) {
+      .foot-line__inner {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+
+    .foot-line__links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-md);
+      list-style: none;
+    }
+
+    .foot__link {
+      color: var(--color-ink-2);
+      text-decoration: none;
+      white-space: nowrap;
+      line-height: 1;
+      padding: var(--space-xs) var(--space-2xs);
+      border-radius: var(--radius-btn);
+      outline: 2px solid var(--color-transparent);
+      outline-offset: 2px;
+    }
+
+    .foot__link:hover {
+      color: var(--color-ink);
+      text-decoration: underline;
+    }
+
+    .foot__link:focus-visible {
+      outline-color: var(--color-focus);
+    }
+
+    .foot__link:active {
+      color: var(--color-accent);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- N5 · Floating Pill Navigation -->
+  <header class="nav-wrap" role="banner">
+    <nav class="nav-pill" aria-label="Primary">
+      <a href="#" class="wordmark">
+        <span class="wordmark__dot" aria-hidden="true"></span>
+        disk-guard
+      </a>
+      <ul class="nav-pill__links">
+        <li><a href="#workflow" class="nav__link">Lifecycle</a></li>
+        <li><a href="#targets" class="nav__link">Targets</a></li>
+        <li><a href="#config" class="nav__link">Flags</a></li>
+      </ul>
+      <a href="https://github.com/cskwork/disk-guard" class="btn btn--nav" target="_blank" rel="noopener noreferrer">
+        <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        Star on GitHub
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- H2 · Split Diptych Hero -->
+    <section class="hero">
+      <div class="container hero__grid">
+        <div>
+          <p class="hero__tag">macOS LaunchAgent &middot; Windows Scheduled Task</p>
+          <h1 class="hero__title">Stop Chromium clones and temp caches from silently filling your disk.</h1>
+          <p class="hero__lede">
+            Every browser automation run, Electron update, and test suite leaves orphaned gigabytes in system temp folders. <strong>disk-guard</strong> sweeps stale artifacts at login and 04:00 daily with zero runtime dependencies.
+          </p>
+          <div class="hero__actions">
+            <a href="https://github.com/cskwork/disk-guard" class="btn" target="_blank" rel="noopener noreferrer">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+              Star on GitHub
+            </a>
+            <a href="#workflow" class="btn btn--outline">Inspect workflow</a>
+          </div>
+        </div>
+
+        <div class="cmd-panel" aria-label="Installation commands">
+          <div class="cmd-panel__head">
+            <div class="os-tabs" role="tablist" aria-label="Operating System">
+              <button type="button" class="os-tab" role="tab" id="tab-macos" aria-selected="true" aria-controls="panel-cmd" data-os="macos">macOS (bash)</button>
+              <button type="button" class="os-tab" role="tab" id="tab-windows" aria-selected="false" aria-controls="panel-cmd" data-os="windows">Windows (PowerShell)</button>
+            </div>
+            <button type="button" class="copy-btn" id="copy-btn" aria-label="Copy install command">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copy-label">Copy</span>
+            </button>
+          </div>
+          <pre class="cmd-code" id="panel-cmd" role="tabpanel" aria-labelledby="tab-macos">git clone https://github.com/cskwork/disk-guard.git
+cd disk-guard
+./install.sh</pre>
+          <div class="cmd-meta">
+            <span id="cmd-scheduler">Scheduler: ~/Library/LaunchAgents/com.disk-guard.agent.plist</span>
+            <span>MIT License</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- T4 · Numbered Stat Strip (Real parameters only) -->
+    <section class="stat-strip" aria-label="Retention thresholds">
+      <div class="container stat-strip__grid">
+        <div class="stat-item">
+          <div class="stat-item__num">180 min</div>
+          <p class="stat-item__label">TTL for orphaned Chromium <code>code_sign_clone</code> and <code>scoped_dir*</code> bundles</p>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item__num">24 hr</div>
+          <p class="stat-item__label">TTL for transient <code>XcodeDistPipeline.*</code>, Playwright, and Puppeteer profiles</p>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item__num">72 hr</div>
+          <p class="stat-item__label">TTL for <code>pytest-of-$USER</code>, Instruments traces, and <code>.codex/visualizations</code></p>
+        </div>
+        <div class="stat-item">
+          <div class="stat-item__num">04:00</div>
+          <p class="stat-item__label">Scheduled daily sweep plus automatic execution at user login</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Macrostructure 14 · Narrative Workflow -->
+    <section class="section" id="workflow">
+      <div class="container">
+        <div class="section__head">
+          <h2 class="section__title">How the lifecycle works from leak to reclaim.</h2>
+          <p class="section__desc">
+            No background daemon polling CPU every second. disk-guard hooks directly into the native OS scheduler and runs a deterministic four-stage sweep.
+          </p>
+        </div>
+
+        <ol class="workflow-list">
+          <li class="workflow-stage">
+            <div class="stage__header">
+              <span class="stage__num">1.0 &middot; ACCUMULATION</span>
+              <h3 class="stage__title">Browsers and build tools leak multi-gigabyte clones into per-user temp directories.</h3>
+            </div>
+            <div>
+              <p class="stage__body">
+                On macOS, Google Chrome and Electron apps duplicate full application bundles inside <code>DARWIN_USER_DIR/X/*.code_sign_clone</code> during background signature verification. On Windows, headless sessions leave <code>scoped_dir*</code> and <code>chrome_BITS_*</code> directories in <code>%TEMP%</code>. When processes crash or exit uncleanly, the OS never reclaims them until a full reboot.
+              </p>
+              <pre class="stage__proof">$ getconf DARWIN_USER_DIR
+/var/folders/xx/.../0/
+# Stale bundles accumulate under ../X/*.code_sign_clone and ../T/XcodeDistPipeline.*</pre>
+            </div>
+          </li>
+
+          <li class="workflow-stage">
+            <div class="stage__header">
+              <span class="stage__num">2.0 &middot; REGISTRATION</span>
+              <h3 class="stage__title">One script registers a native user-space schedule without root privileges.</h3>
+            </div>
+            <div>
+              <p class="stage__body">
+                Running <code>./install.sh</code> on macOS writes `~/.local/bin/disk-guard.sh` and bootstraps a user `LaunchAgent` (`com.disk-guard.agent`). Running `install.ps1` on Windows copies `disk-guard.ps1` to `%LOCALAPPDATA%\disk-guard` and registers `DiskGuard-Daily` and `DiskGuard-Logon` via `schtasks.exe`.
+              </p>
+              <pre class="stage__proof">Installed disk-guard:
+  Script:   ~/.local/bin/disk-guard.sh
+  Schedule: ~/Library/LaunchAgents/com.disk-guard.agent.plist (daily at 04:00 + on login)
+  Log:      ~/Library/Logs/disk-guard.log</pre>
+            </div>
+          </li>
+
+          <li class="workflow-stage">
+            <div class="stage__header">
+              <span class="stage__num">3.0 &middot; DRY-RUN AUDIT</span>
+              <h3 class="stage__title">Preview every candidate path before deleting a single byte.</h3>
+            </div>
+            <div>
+              <p class="stage__body">
+                Pass <code>--dry-run</code> on macOS or <code>-DryRun</code> on Windows to list every directory that exceeds its age threshold without modifying the filesystem. All user directories (`$USER`, `$USERNAME`, `DARWIN_USER_DIR`, `%TEMP%`) are resolved dynamically at runtime.
+              </p>
+              <pre class="stage__proof">$ ~/.local/bin/disk-guard.sh --dry-run
+[2026-10-17 04:00:00] disk-guard start (user: dev, dry-run: 1, free: 64Gi)
+  [dry-run] delete /var/folders/.../X/com.google.Chrome.code_sign_clone/Clone_98a1
+  [dry-run] delete /var/folders/.../T/XcodeDistPipeline.812a
+[2026-10-17 04:00:01] disk-guard done  (free: 64Gi)</pre>
+            </div>
+          </li>
+
+          <li class="workflow-stage">
+            <div class="stage__header">
+              <span class="stage__num">4.0 &middot; SCHEDULED PURGE</span>
+              <h3 class="stage__title">Age-gated pruning keeps active sessions untouched and logs reclaimed space.</h3>
+            </div>
+            <div>
+              <p class="stage__body">
+                Only directories older than their respective TTL (`180` minutes for code-sign clones, `1` day for build pipelines, `3` days for test artifacts) are removed, ensuring running browser sessions and active test suites are never interrupted.
+              </p>
+              <pre class="stage__proof">[2026-10-17 04:00:00] disk-guard start (user: dev, dry-run: 0, free: 64Gi)
+[2026-10-17 04:00:03] disk-guard done  (free: 88Gi)</pre>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- F3 · Tabular Spec Sheet (Targets) -->
+    <section class="section section--alt" id="targets">
+      <div class="container">
+        <div class="section__head">
+          <h2 class="section__title">Cross-platform cleanup specification.</h2>
+          <p class="section__desc">
+            Every target directory is matched against modification time before deletion. Custom directories can be appended via <code>DISK_GUARD_EXTRA_PATHS</code>.
+          </p>
+        </div>
+
+        <div class="spec-wrap">
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th scope="col">Category</th>
+                <th scope="col">macOS Path Pattern</th>
+                <th scope="col">Windows Path Pattern</th>
+                <th scope="col">Default TTL</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-label="Category">Chromium &amp; Electron Clones</td>
+                <td data-label="macOS Path Pattern"><code class="spec-code">$DARWIN_USER_DIR/X/*.code_sign_clone/*</code></td>
+                <td data-label="Windows Path Pattern"><code class="spec-code">%TEMP%\scoped_dir*</code>, <code class="spec-code">chrome_BITS_*</code></td>
+                <td data-label="Default TTL">180 minutes</td>
+              </tr>
+              <tr>
+                <td data-label="Category">Build &amp; Browser Pipelines</td>
+                <td data-label="macOS Path Pattern"><code class="spec-code">$DARWIN_USER_DIR/T/XcodeDistPipeline.*</code>, <code class="spec-code">scoped_dir*</code></td>
+                <td data-label="Windows Path Pattern"><code class="spec-code">%TEMP%\playwright*</code>, <code class="spec-code">puppeteer_dev_chrome_profile-*</code></td>
+                <td data-label="Default TTL">1 day</td>
+              </tr>
+              <tr>
+                <td data-label="Category">Test &amp; Profiling Artifacts</td>
+                <td data-label="macOS Path Pattern"><code class="spec-code">$DARWIN_USER_DIR/C/com.apple.dt.Instruments</code>, <code class="spec-code">T/pytest-of-$USER</code></td>
+                <td data-label="Windows Path Pattern"><code class="spec-code">%TEMP%\pytest-of-%USERNAME%</code></td>
+                <td data-label="Default TTL">3 days</td>
+              </tr>
+              <tr>
+                <td data-label="Category">Agent Visualization Caches</td>
+                <td data-label="macOS Path Pattern"><code class="spec-code">~/.codex/visualizations/*</code></td>
+                <td data-label="Windows Path Pattern"><code class="spec-code">%USERPROFILE%\.codex\visualizations\*</code></td>
+                <td data-label="Default TTL">3 days</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- F3 · Configuration Flags Table -->
+    <section class="section" id="config">
+      <div class="container">
+        <div class="section__head">
+          <h2 class="section__title">Runtime flags and environment overrides.</h2>
+          <p class="section__desc">
+            Tune retention windows per machine using CLI flags or environment variables without editing the script.
+          </p>
+        </div>
+
+        <div class="spec-wrap">
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th scope="col">Environment Variable</th>
+                <th scope="col">macOS Flag</th>
+                <th scope="col">Windows Flag</th>
+                <th scope="col">Default</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-label="Environment Variable"><code class="spec-code">DISK_GUARD_CLONE_TTL_MINUTES</code></td>
+                <td data-label="macOS Flag"><code class="spec-code">--clone-ttl-minutes N</code></td>
+                <td data-label="Windows Flag"><code class="spec-code">-CloneTtlMinutes N</code></td>
+                <td data-label="Default">180</td>
+              </tr>
+              <tr>
+                <td data-label="Environment Variable"><code class="spec-code">DISK_GUARD_PIPELINE_TTL_DAYS</code></td>
+                <td data-label="macOS Flag"><code class="spec-code">--pipeline-ttl-days N</code></td>
+                <td data-label="Windows Flag"><code class="spec-code">-PipelineTtlDays N</code></td>
+                <td data-label="Default">1</td>
+              </tr>
+              <tr>
+                <td data-label="Environment Variable"><code class="spec-code">DISK_GUARD_ARTIFACT_TTL_DAYS</code></td>
+                <td data-label="macOS Flag"><code class="spec-code">--artifact-ttl-days N</code></td>
+                <td data-label="Windows Flag"><code class="spec-code">-ArtifactTtlDays N</code></td>
+                <td data-label="Default">3</td>
+              </tr>
+              <tr>
+                <td data-label="Environment Variable"><code class="spec-code">DISK_GUARD_EXTRA_PATHS</code></td>
+                <td data-label="macOS Flag"><code class="spec-code">colon-separated (:)</code></td>
+                <td data-label="Windows Flag"><code class="spec-code">semicolon-separated (;)</code></td>
+                <td data-label="Default">empty</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Closing Star CTA Band -->
+    <section class="cta-band" aria-label="Get started">
+      <div class="container">
+        <div class="cta-band__box">
+          <div>
+            <h2 class="cta-band__title">Keep your workstation disk clean across every reboot.</h2>
+            <p class="cta-band__sub">Auditable shell and PowerShell scripts. Under 150 lines of code, MIT licensed, zero external packages.</p>
+          </div>
+          <a href="https://github.com/cskwork/disk-guard" class="btn" target="_blank" rel="noopener noreferrer">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+            Star cskwork/disk-guard
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Ft2 · Inline Single Line Footer -->
+  <footer class="foot-line">
+    <div class="container foot-line__inner">
+      <p><strong>disk-guard</strong> &middot; Portable scheduled temp &amp; clone cleaner &middot; MIT License</p>
+      <ul class="foot-line__links">
+        <li><a href="https://github.com/cskwork/disk-guard" class="foot__link" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
+        <li><a href="https://github.com/cskwork/disk-guard/issues" class="foot__link" target="_blank" rel="noopener noreferrer">Report Issue</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var snippets = {
+        macos: {
+          cmd: "git clone https://github.com/cskwork/disk-guard.git\ncd disk-guard\n./install.sh",
+          scheduler: "Scheduler: ~/Library/LaunchAgents/com.disk-guard.agent.plist"
+        },
+        windows: {
+          cmd: "git clone https://github.com/cskwork/disk-guard.git\ncd disk-guard\npowershell -ExecutionPolicy Bypass -File .\\install.ps1",
+          scheduler: "Scheduler: Windows Task Scheduler (DiskGuard-Daily + Logon)"
+        }
+      };
+
+      var tabs = document.querySelectorAll(".os-tab");
+      var panelCmd = document.getElementById("panel-cmd");
+      var schedulerLabel = document.getElementById("cmd-scheduler");
+      var copyBtn = document.getElementById("copy-btn");
+      var copyLabel = document.getElementById("copy-label");
+      var activeOs = "macos";
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function (e) {
+          e.preventDefault();
+          var os = tab.getAttribute("data-os");
+          if (!os || !snippets[os]) return;
+          activeOs = os;
+          tabs.forEach(function (t) {
+            var selected = t === tab;
+            t.setAttribute("aria-selected", selected ? "true" : "false");
+          });
+          panelCmd.textContent = snippets[os].cmd;
+          panelCmd.setAttribute("aria-labelledby", tab.id);
+          schedulerLabel.textContent = snippets[os].scheduler;
+          tab.focus({ preventScroll: true });
+        });
+      });
+
+      copyBtn.addEventListener("click", function () {
+        var text = snippets[activeOs].cmd;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            copyLabel.textContent = "Copied";
+            setTimeout(function () {
+              copyLabel.textContent = "Copy";
+            }, 1600);
+          });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
